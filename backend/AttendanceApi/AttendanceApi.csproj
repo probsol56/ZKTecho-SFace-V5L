@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- zkemkeeper.dll (ZKTeco's attendance terminal COM SDK) is a 32-bit-only COM
+         server - see Services/ZkemkeeperDeviceClient.cs. -->
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Generated once via TlbImp against the registered zkemkeeper.dll (ProgID
+         zkemkeeper.ZKEM, TypeLib {FE9DED34-E159-408E-8490-B720A5E632C7} v1.0). Only
+         a managed metadata shim - the actual COM server is resolved from the Windows
+         registry at runtime, so this requires zkemkeeper.dll to be registered
+         (regsvr32) on any machine that runs this API. -->
+    <Reference Include="Interop.zkemkeeper">
+      <HintPath>ComInterop\Interop.zkemkeeper.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
