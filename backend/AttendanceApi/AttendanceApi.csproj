@@ -7,6 +7,7 @@
     <!-- zkemkeeper.dll (ZKTeco's attendance terminal COM SDK) is a 32-bit-only COM
          server - see Services/ZkemkeeperDeviceClient.cs. -->
     <PlatformTarget>x86</PlatformTarget>
+    <UserSecretsId>b49e3f4a-63f4-42e5-b42e-1022aeb3baef</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
