@@ -12,6 +12,7 @@ builder.Services.AddDbContext<AttendanceDbContext>(options =>
 
 builder.Services.AddScoped<IZkDeviceClient, ZkemkeeperDeviceClient>();
 builder.Services.AddScoped<DeviceSyncService>();
+builder.Services.AddScoped<DeviceTemplateTransferService>();
 
 var app = builder.Build();
 

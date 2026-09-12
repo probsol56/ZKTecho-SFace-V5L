@@ -32,6 +32,17 @@ export type SyncResult = {
   logsInserted: number;
 };
 
+export type TemplateTransferOutcome = {
+  employeeId: number;
+  employeeName: string;
+  success: boolean;
+  error: string | null;
+};
+
+export type TemplateTransferResult = {
+  outcomes: TemplateTransferOutcome[];
+};
+
 export type DeviceStatus = "online" | "offline" | "never";
 
 export type DeviceStatusSummary = {
@@ -95,6 +106,17 @@ export function deleteDevice(id: number) {
 
 export function syncDevice(id: number) {
   return apiFetch<SyncResult>(`/api/devices/${id}/sync`, { method: "POST" });
+}
+
+export function transferTemplates(input: { sourceDeviceId: number; targetDeviceId: number; employeeIds: number[] }) {
+  return apiFetch<TemplateTransferResult>("/api/devices/transfer-templates", {
+    method: "POST",
+    body: JSON.stringify({
+      sourceDeviceId: input.sourceDeviceId,
+      targetDeviceId: input.targetDeviceId,
+      employeeIds: input.employeeIds,
+    }),
+  });
 }
 
 export function getEmployees(params: { page?: number; pageSize?: number } = {}) {

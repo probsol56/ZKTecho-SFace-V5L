@@ -8,9 +8,12 @@ namespace AttendanceApi.Controllers;
 
 public record CreateDeviceRequest(string Name, string IpAddress, int Port, string? SerialNumber);
 
+public record TransferTemplatesRequest(int SourceDeviceId, int TargetDeviceId, List<int> EmployeeIds);
+
 [ApiController]
 [Route("api/[controller]")]
-public class DevicesController(AttendanceDbContext db, DeviceSyncService syncService) : ControllerBase
+public class DevicesController(
+    AttendanceDbContext db, DeviceSyncService syncService, DeviceTemplateTransferService transferService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<Device>>> GetAll()
@@ -60,6 +63,30 @@ public class DevicesController(AttendanceDbContext db, DeviceSyncService syncSer
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+    }
+
+    [HttpPost("transfer-templates")]
+    public async Task<ActionResult<TemplateTransferResult>> TransferTemplates(TransferTemplatesRequest request, CancellationToken ct)
+    {
+        if (request.EmployeeIds.Count == 0)
+        {
+            return BadRequest("At least one employee is required.");
+        }
+
+        try
+        {
+            var result = await transferService.TransferAsync(
+                request.SourceDeviceId, request.TargetDeviceId, request.EmployeeIds, ct);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
         }
     }
 }

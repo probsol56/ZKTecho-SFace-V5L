@@ -92,6 +92,110 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
         });
     }
 
+    private const int MaxFingerIndex = 9; // ZK protocol supports finger slots 0-9
+    private const int FaceIndex = 0; // zkemkeeper stores a single primary face template per user
+
+    public Task<IReadOnlyDictionary<string, DeviceUserTemplates>> GetTemplatesAsync(
+        string ipAddress, int port, IReadOnlyList<string> deviceUserIds)
+    {
+        return Task.Run<IReadOnlyDictionary<string, DeviceUserTemplates>>(() =>
+        {
+            var zk = Connect(ipAddress, port);
+            try
+            {
+                var result = new Dictionary<string, DeviceUserTemplates>();
+                foreach (var deviceUserId in deviceUserIds)
+                {
+                    var fingerprints = new List<DeviceTemplateRecord>();
+                    for (var fingerIndex = 0; fingerIndex <= MaxFingerIndex; fingerIndex++)
+                    {
+                        if (zk.GetUserTmpExStr(
+                                MachineNumber, deviceUserId, fingerIndex, out var flag, out var tmpData, out var tmpLength)
+                            && tmpLength > 0)
+                        {
+                            fingerprints.Add(new DeviceTemplateRecord(TemplateKind.Fingerprint, fingerIndex, flag, tmpData));
+                        }
+                    }
+
+                    var faces = new List<DeviceTemplateRecord>();
+                    var faceData = string.Empty;
+                    var faceLength = 0;
+                    if (zk.GetUserFaceStr(MachineNumber, deviceUserId, FaceIndex, ref faceData, ref faceLength)
+                        && faceLength > 0)
+                    {
+                        faces.Add(new DeviceTemplateRecord(TemplateKind.Face, FaceIndex, 0, faceData));
+                    }
+
+                    var templates = new DeviceUserTemplates(fingerprints, faces);
+                    if (!templates.IsEmpty)
+                    {
+                        result[deviceUserId] = templates;
+                    }
+                }
+                return result;
+            }
+            finally
+            {
+                zk.Disconnect();
+            }
+        });
+    }
+
+    public Task<IReadOnlyDictionary<string, bool>> WriteTemplatesAsync(
+        string ipAddress, int port,
+        IReadOnlyList<(DeviceUserRecord User, DeviceUserTemplates Templates)> users)
+    {
+        return Task.Run<IReadOnlyDictionary<string, bool>>(() =>
+        {
+            var zk = Connect(ipAddress, port);
+            try
+            {
+                // Disable the device while writing so an in-progress finger/face
+                // scan can't race the enrollment write for the same user.
+                zk.EnableDevice(MachineNumber, false);
+
+                var results = new Dictionary<string, bool>();
+                foreach (var (user, templates) in users)
+                {
+                    // SSR_SetUserInfo has no card-number parameter - the SDK reads it
+                    // from this "current" context, which persists across calls on the
+                    // same connection. Always set it (blank when absent) so a card
+                    // number doesn't leak from the previous user in this batch.
+                    zk.SetStrCardNumber(user.CardNumber ?? string.Empty);
+
+                    var userOk = zk.SSR_SetUserInfo(MachineNumber, user.DeviceUserId, user.Name, string.Empty, user.Role, true);
+                    if (!userOk)
+                    {
+                        results[user.DeviceUserId] = false;
+                        continue;
+                    }
+
+                    var templatesOk = true;
+                    foreach (var fingerprint in templates.Fingerprints)
+                    {
+                        templatesOk &= zk.SetUserTmpExStr(
+                            MachineNumber, user.DeviceUserId, fingerprint.Index, fingerprint.Flag, fingerprint.Data);
+                    }
+
+                    foreach (var face in templates.Faces)
+                    {
+                        templatesOk &= zk.SetUserFaceStr(MachineNumber, user.DeviceUserId, face.Index, face.Data, face.Data.Length);
+                    }
+
+                    results[user.DeviceUserId] = templatesOk;
+                }
+
+                zk.RefreshData(MachineNumber);
+                return results;
+            }
+            finally
+            {
+                zk.EnableDevice(MachineNumber, true);
+                zk.Disconnect();
+            }
+        });
+    }
+
     private static CZKEMClass Connect(string ipAddress, int port)
     {
         var zk = new CZKEMClass();

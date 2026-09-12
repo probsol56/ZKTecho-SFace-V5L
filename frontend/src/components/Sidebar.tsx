@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandMark } from "./BrandMark";
-import { CloseIcon, DeviceIcon, LogsIcon, MenuIcon, PeopleIcon, PulseIcon } from "./icons";
+import { CloseIcon, DeviceIcon, LogsIcon, MenuIcon, PeopleIcon, PulseIcon, TransferIcon } from "./icons";
 
 const links = [
   { href: "/", label: "Dashboard", Icon: PulseIcon },
   { href: "/devices", label: "Devices", Icon: DeviceIcon },
   { href: "/logs", label: "Attendance logs", Icon: LogsIcon },
   { href: "/employees", label: "Employees", Icon: PeopleIcon },
+  { href: "/transfer", label: "Transfer biometrics", Icon: TransferIcon },
 ];
 
 export function Sidebar() {

@@ -73,6 +73,15 @@ export function CloseIcon({ className }: IconProps) {
   );
 }
 
+export function TransferIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 8h13M13 4.5 17 8l-4 3.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20 16H7M11 12.5 7 16l4 3.5" />
+    </svg>
+  );
+}
+
 export function ChevronLeftIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">
