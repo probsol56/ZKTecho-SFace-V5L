@@ -45,7 +45,13 @@ public class AttendanceLogsController(AttendanceDbContext db) : ControllerBase
             // Npgsql only accepts Kind=Utc for timestamptz; query-bound DateTimes can
             // arrive as Unspecified or Local depending on the input format.
             if (from is not null) from = ToUtc(from.Value);
-            if (to is not null) to = ToUtc(to.Value);
+            if (to is not null)
+            {
+                to = ToUtc(to.Value);
+                // A date-only "to" (e.g. from a <input type="date">, midnight) means
+                // "through the end of that day", not the exact instant of midnight.
+                if (to.Value.TimeOfDay == TimeSpan.Zero) to = to.Value.AddDays(1).AddTicks(-1);
+            }
         }
 
         var query = db.AttendanceLogs
