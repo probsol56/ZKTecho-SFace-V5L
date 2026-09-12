@@ -14,8 +14,8 @@ Attendance tracking for ZKTeco biometric terminals: pulls users/logs from device
 
 ```
 backend/AttendanceApi/    .NET 10 Web API
-  Controllers/             Adms, Devices, Employees, AttendanceLogs
-  Services/                DeviceSyncService, ZkemkeeperDeviceClient (device I/O)
+  Controllers/             Adms (device-initiated push over plain HTTP, no zkemkeeper), Devices (server-initiated pull via zkemkeeper), Employees, AttendanceLogs
+  Services/                DeviceSyncService, ZkemkeeperDeviceClient (COM pull path only)
   Models/                  Device, Employee, AttendanceLog (EF entities)
   Data/                    AttendanceDbContext
   Migrations/              EF Core migrations (source of truth for schema)

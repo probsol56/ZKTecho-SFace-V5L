@@ -6,15 +6,17 @@ Attendance tracking for ZKTeco biometric terminals. Pulls users and attendance l
 
 - **Backend:** .NET 10 Web API (`AttendanceApi`) — Controllers → Services → EF Core (Npgsql), no CQRS/MediatR.
 - **Database:** PostgreSQL, plain EF Core — no RLS/multi-tenancy.
-- **Device integration:** ZKTeco `zkemkeeper.dll` COM SDK. This forces the API to run as a 32-bit (x86) process, and `zkemkeeper.dll` must be registered (`regsvr32`) on any machine that runs it.
+- **Device integration:** two independent paths.
+  - **Pull** — `DevicesController`'s `/sync` endpoint uses the ZKTeco `zkemkeeper.dll` COM SDK to actively fetch users/logs from a device. This forces the API to run as a 32-bit (x86) process, and `zkemkeeper.dll` must be registered (`regsvr32`) on any machine that runs it.
+  - **Push (ADMS)** — `AdmsController` (`/iclock/*`) receives data the terminal pushes on its own, over plain HTTP/text, when configured under the device's COMM > Cloud Server Setting. No COM interop and no x86 requirement for this path.
 - **Frontend:** Next.js 16 (App Router) + React 19 + Tailwind 4, pnpm. Plain `fetch`-based API client talking to the backend over HTTP; Server Actions for mutations.
 
 ## Repository map
 
 ```
 backend/AttendanceApi/    .NET 10 Web API
-  Controllers/             Adms, Devices, Employees, AttendanceLogs, Dashboard
-  Services/                DeviceSyncService, ZkemkeeperDeviceClient (device I/O)
+  Controllers/             Adms (ADMS push, no zkemkeeper), Devices (zkemkeeper pull), Employees, AttendanceLogs, Dashboard
+  Services/                DeviceSyncService, ZkemkeeperDeviceClient (COM pull path only)
   Models/                  Device, Employee, AttendanceLog (EF entities)
   Data/                    AttendanceDbContext
   Migrations/              EF Core migrations (source of truth for schema)
