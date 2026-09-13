@@ -1,4 +1,4 @@
-import { getDevices, getEmployees } from "@/lib/api";
+import { getDevices } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -6,13 +6,8 @@ import { TransferForm } from "./TransferForm";
 
 export const dynamic = "force-dynamic";
 
-const EMPLOYEE_FETCH_LIMIT = 200;
-
 export default async function TransferPage() {
-  const [devices, employeePage] = await Promise.all([
-    getDevices(),
-    getEmployees({ pageSize: EMPLOYEE_FETCH_LIMIT }),
-  ]);
+  const devices = await getDevices();
 
   return (
     <div className="flex flex-col gap-8">
@@ -28,7 +23,7 @@ export default async function TransferPage() {
             description="Transferring templates needs at least two registered devices - one source, one target."
           />
         ) : (
-          <TransferForm devices={devices} employees={employeePage.items} employeeTotalCount={employeePage.totalCount} />
+          <TransferForm devices={devices} />
         )}
       </Card>
     </div>

@@ -37,9 +37,12 @@ public interface IZkDeviceClient
         string ipAddress, int port, IReadOnlyList<string> deviceUserIds);
 
     // Writes each user's info (creating the enrollment on this device if it
-    // doesn't exist yet) followed by their templates. Returns per-user success so
-    // one employee's failure doesn't hide the rest of the batch's results.
-    Task<IReadOnlyDictionary<string, bool>> WriteTemplatesAsync(
+    // doesn't exist yet) followed by their templates, one user at a time.
+    // onProgress is invoked synchronously, on the calling thread, right after each
+    // user is written - so a caller streaming progress to a client sees it exactly
+    // in write order, and one employee's failure doesn't hide the rest of the batch.
+    Task WriteTemplatesAsync(
         string ipAddress, int port,
-        IReadOnlyList<(DeviceUserRecord User, DeviceUserTemplates Templates)> users);
+        IReadOnlyList<(DeviceUserRecord User, DeviceUserTemplates Templates)> users,
+        Action<string, bool> onProgress);
 }

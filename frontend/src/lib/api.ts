@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:5098";
+export const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:5098";
 
 export type Device = {
   id: number;
@@ -32,15 +32,20 @@ export type SyncResult = {
   logsInserted: number;
 };
 
+// A user as it actually exists on a terminal right now - not an Employee row,
+// which has no per-device mapping (see backend/AttendanceApi/Models/Employee.cs).
+export type DeviceUser = {
+  deviceUserId: string;
+  name: string;
+  cardNumber: string | null;
+  role: number;
+};
+
 export type TemplateTransferOutcome = {
-  employeeId: number;
+  deviceUserId: string;
   employeeName: string;
   success: boolean;
   error: string | null;
-};
-
-export type TemplateTransferResult = {
-  outcomes: TemplateTransferOutcome[];
 };
 
 export type DeviceStatus = "online" | "offline" | "never";
@@ -100,6 +105,10 @@ export function createDevice(input: { name: string; ipAddress: string; port: num
   return apiFetch<Device>("/api/devices", { method: "POST", body: JSON.stringify(input) });
 }
 
+export function updateDevice(id: number, input: { name: string; ipAddress: string; port: number; serialNumber?: string }) {
+  return apiFetch<Device>(`/api/devices/${id}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
 export function deleteDevice(id: number) {
   return apiFetch<void>(`/api/devices/${id}`, { method: "DELETE" });
 }
@@ -108,15 +117,8 @@ export function syncDevice(id: number) {
   return apiFetch<SyncResult>(`/api/devices/${id}/sync`, { method: "POST" });
 }
 
-export function transferTemplates(input: { sourceDeviceId: number; targetDeviceId: number; employeeIds: number[] }) {
-  return apiFetch<TemplateTransferResult>("/api/devices/transfer-templates", {
-    method: "POST",
-    body: JSON.stringify({
-      sourceDeviceId: input.sourceDeviceId,
-      targetDeviceId: input.targetDeviceId,
-      employeeIds: input.employeeIds,
-    }),
-  });
+export function getDeviceLiveUsers(deviceId: number) {
+  return apiFetch<DeviceUser[]>(`/api/devices/${deviceId}/live-users`);
 }
 
 export function getEmployees(params: { page?: number; pageSize?: number } = {}) {

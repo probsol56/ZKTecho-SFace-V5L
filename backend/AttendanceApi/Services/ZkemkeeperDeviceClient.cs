@@ -141,11 +141,12 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
         });
     }
 
-    public Task<IReadOnlyDictionary<string, bool>> WriteTemplatesAsync(
+    public Task WriteTemplatesAsync(
         string ipAddress, int port,
-        IReadOnlyList<(DeviceUserRecord User, DeviceUserTemplates Templates)> users)
+        IReadOnlyList<(DeviceUserRecord User, DeviceUserTemplates Templates)> users,
+        Action<string, bool> onProgress)
     {
-        return Task.Run<IReadOnlyDictionary<string, bool>>(() =>
+        return Task.Run(() =>
         {
             var zk = Connect(ipAddress, port);
             try
@@ -154,7 +155,6 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
                 // scan can't race the enrollment write for the same user.
                 zk.EnableDevice(MachineNumber, false);
 
-                var results = new Dictionary<string, bool>();
                 foreach (var (user, templates) in users)
                 {
                     // SSR_SetUserInfo has no card-number parameter - the SDK reads it
@@ -166,7 +166,7 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
                     var userOk = zk.SSR_SetUserInfo(MachineNumber, user.DeviceUserId, user.Name, string.Empty, user.Role, true);
                     if (!userOk)
                     {
-                        results[user.DeviceUserId] = false;
+                        onProgress(user.DeviceUserId, false);
                         continue;
                     }
 
@@ -182,11 +182,10 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
                         templatesOk &= zk.SetUserFaceStr(MachineNumber, user.DeviceUserId, face.Index, face.Data, face.Data.Length);
                     }
 
-                    results[user.DeviceUserId] = templatesOk;
+                    onProgress(user.DeviceUserId, templatesOk);
                 }
 
                 zk.RefreshData(MachineNumber);
-                return results;
             }
             finally
             {

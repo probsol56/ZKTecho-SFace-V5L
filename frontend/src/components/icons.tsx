@@ -57,6 +57,15 @@ export function TrashIcon({ className }: IconProps) {
   );
 }
 
+export function EditIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.5 4.5 19.5 8.5 8 20H4v-4Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6.5 17.5 10.5" />
+    </svg>
+  );
+}
+
 export function MenuIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">

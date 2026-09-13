@@ -88,6 +88,28 @@ public class AdmsController(AttendanceDbContext db, DeviceSyncService syncServic
         return Content("OK", "text/plain");
     }
 
+    // Photo upload: POST /iclock/fdata?SN=...&table=ATTPHOTO&PhotoStamp=...
+    // Devices with a camera push a snapshot taken at punch time here, separate
+    // from the face template used for matching. We don't store photos yet, but
+    // the body must still be drained and acknowledged with "OK" - otherwise the
+    // device treats the upload as failed and retries it forever, blocking every
+    // other queued upload (including ATTLOG) behind it.
+    [HttpPost("fdata")]
+    public async Task<IActionResult> PushPhoto(
+        [FromQuery(Name = "SN")] string serialNumber,
+        [FromQuery] string? table,
+        CancellationToken ct)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var body = await reader.ReadToEndAsync(ct);
+
+        logger.LogInformation(
+            "ADMS fdata push from SN={SerialNumber} (table={Table}): {Length} bytes received, not stored",
+            serialNumber, table, body.Length);
+
+        return Content("OK", "text/plain");
+    }
+
     // Command polling: device asks "do you have anything for me?" - we never
     // queue commands (no ClearGeneralLogData/remote-command support yet), so
     // always answer with no pending commands.

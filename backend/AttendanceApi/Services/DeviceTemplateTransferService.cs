@@ -1,18 +1,24 @@
 using AttendanceApi.Data;
-using AttendanceApi.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace AttendanceApi.Services;
 
-public record TemplateTransferOutcome(int EmployeeId, string EmployeeName, bool Success, string? Error);
+public record TemplateTransferOutcome(string DeviceUserId, string EmployeeName, bool Success, string? Error);
 
-public record TemplateTransferResult(IReadOnlyList<TemplateTransferOutcome> Outcomes);
-
+// Transfers fingerprint/face templates directly between two terminals, keyed by
+// device user ID. This deliberately never reads or writes the Employees table -
+// the employee list shown for a transfer always comes from a live query of the
+// source device (see DevicesController.GetLiveUsers), so what the user picks
+// from is guaranteed to match what actually exists on that terminal.
 public class DeviceTemplateTransferService(
     AttendanceDbContext db, IZkDeviceClient deviceClient, ILogger<DeviceTemplateTransferService> logger)
 {
-    public async Task<TemplateTransferResult> TransferAsync(
-        int sourceDeviceId, int targetDeviceId, IReadOnlyList<int> employeeIds, CancellationToken ct = default)
+    // onProgress is invoked once per employee, in the order their outcome becomes
+    // known, so a caller can stream live status to a client instead of waiting for
+    // the whole batch to finish.
+    public async Task TransferAsync(
+        int sourceDeviceId, int targetDeviceId, IReadOnlyList<DeviceUserRecord> employees,
+        Action<TemplateTransferOutcome> onProgress, CancellationToken ct = default)
     {
         if (sourceDeviceId == targetDeviceId)
         {
@@ -24,51 +30,40 @@ public class DeviceTemplateTransferService(
         var target = await db.Devices.FindAsync([targetDeviceId], ct)
             ?? throw new KeyNotFoundException($"Device {targetDeviceId} not found");
 
-        var employees = await db.Employees
-            .Where(e => employeeIds.Contains(e.Id))
-            .ToListAsync(ct);
-
         var deviceUserIds = employees.Select(e => e.DeviceUserId).ToList();
         var templatesByUser = await deviceClient.GetTemplatesAsync(source.IpAddress, source.Port, deviceUserIds);
 
-        var outcomes = new List<TemplateTransferOutcome>();
-        var employeesWithTemplates = new List<(Employee Employee, DeviceUserTemplates Templates)>();
+        var toWrite = new List<(DeviceUserRecord User, DeviceUserTemplates Templates)>();
+        var successCount = 0;
 
         foreach (var employee in employees)
         {
             if (templatesByUser.TryGetValue(employee.DeviceUserId, out var templates))
             {
-                employeesWithTemplates.Add((employee, templates));
+                toWrite.Add((employee, templates));
             }
             else
             {
-                outcomes.Add(new TemplateTransferOutcome(
-                    employee.Id, employee.Name, false, "No fingerprint or face templates found on the source device."));
+                onProgress(new TemplateTransferOutcome(
+                    employee.DeviceUserId, employee.Name, false, "No fingerprint or face templates found on the source device."));
             }
         }
 
-        if (employeesWithTemplates.Count > 0)
+        if (toWrite.Count > 0)
         {
-            var toWrite = employeesWithTemplates
-                .Select(x => (
-                    User: new DeviceUserRecord(x.Employee.DeviceUserId, x.Employee.Name, x.Employee.CardNumber, x.Employee.Role),
-                    x.Templates))
-                .ToList();
+            var namesByDeviceUserId = toWrite.ToDictionary(x => x.User.DeviceUserId, x => x.User.Name);
 
-            var writeResults = await deviceClient.WriteTemplatesAsync(target.IpAddress, target.Port, toWrite);
-
-            foreach (var (employee, _) in employeesWithTemplates)
+            await deviceClient.WriteTemplatesAsync(target.IpAddress, target.Port, toWrite, (deviceUserId, success) =>
             {
-                var success = writeResults.TryGetValue(employee.DeviceUserId, out var ok) && ok;
-                outcomes.Add(new TemplateTransferOutcome(
-                    employee.Id, employee.Name, success, success ? null : "Failed to write templates to the target device."));
-            }
+                if (success) successCount++;
+                onProgress(new TemplateTransferOutcome(
+                    deviceUserId, namesByDeviceUserId[deviceUserId], success,
+                    success ? null : "Failed to write templates to the target device."));
+            });
         }
 
         logger.LogInformation(
             "Transferred templates for {SuccessCount}/{TotalCount} employees from device {Source} to {Target}",
-            outcomes.Count(o => o.Success), employees.Count, source.Name, target.Name);
-
-        return new TemplateTransferResult(outcomes);
+            successCount, employees.Count, source.Name, target.Name);
     }
 }

@@ -3,8 +3,8 @@ import { getAttendanceLogs, getDevices } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Pagination } from "@/components/ui/Pagination";
 import { SubmitButton } from "@/components/ui/SubmitButton";
-import { ChevronLeftIcon, ChevronRightIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -139,35 +139,7 @@ export default async function LogsPage({
         )}
       </Card>
 
-      {totalCount > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted">
-          <span>
-            Page {page} of {totalPages} &middot; {totalCount} logs
-          </span>
-          <div className="flex gap-2">
-            <Link
-              href={pageHref(page - 1)}
-              aria-disabled={page <= 1}
-              className={`flex items-center gap-1 rounded-md border border-border-strong px-3 py-1.5 ${
-                page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-background"
-              }`}
-            >
-              <ChevronLeftIcon className="h-4 w-4" />
-              Previous
-            </Link>
-            <Link
-              href={pageHref(page + 1)}
-              aria-disabled={page >= totalPages}
-              className={`flex items-center gap-1 rounded-md border border-border-strong px-3 py-1.5 ${
-                page >= totalPages ? "pointer-events-none opacity-40" : "hover:bg-background"
-              }`}
-            >
-              Next
-              <ChevronRightIcon className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
+      {totalCount > 0 && <Pagination page={page} totalPages={totalPages} buildHref={pageHref} />}
     </div>
   );
 }
