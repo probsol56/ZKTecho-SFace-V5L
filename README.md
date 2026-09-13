@@ -62,9 +62,10 @@ The app runs on port 5000.
 ```bash
 dotnet build
 dotnet run --project backend/AttendanceApi
-dotnet ef migrations add <Name> --project backend/AttendanceApi
-dotnet ef database update --project backend/AttendanceApi
 ```
+
+EF Core migrations need an AnyCPU build first — `dotnet ef` runs 64-bit and cannot
+load the x86 output. See `CLAUDE.md` → "EF Core migrations need an AnyCPU build".
 
 **Frontend**
 
@@ -73,6 +74,40 @@ pnpm install --frozen-lockfile
 pnpm lint
 pnpm build
 ```
+
+## Daily attendance
+
+Punches roll up into one `DailyAttendance` row per active employee per working day.
+The rollup runs automatically after every ingest (ADMS push and device pull), and a
+`BackgroundService` closes each day out at **23:45 Asia/Dhaka**, writing `Absent` rows
+for anyone who never punched. On startup it also sweeps the previous 7 days, so a night
+of downtime heals itself.
+
+- **Business timezone is fixed to `Asia/Dhaka`** (`Services/BusinessTime.cs`). Timestamps
+  stay UTC in the database; every day boundary and late check converts through that one class.
+- **Check-in / check-out are `MIN` / `MAX` of the day's punches across all devices.** The
+  device `InOutMode` flag is ignored — most deployments leave it at 0.
+- **Office hours, grace period and weekend days** live in the single-row `WorkSchedule`
+  table, editable via `PUT /api/work-schedule`. Late minutes are counted past
+  `StartTime + GraceMinutes`, so they are always 0 for a `Present` day.
+- **Changing the schedule does not rewrite history.** Follow it with
+  `POST /api/attendance-days/recompute` (`{ "from": "...", "to": "..." }`) for the range
+  that should be re-derived.
+- **`Employee.IsActive` / `JoinDate`** decide who absence is generated for. Set them on
+  the Employees page — they are not device-owned.
+
+Deployment notes:
+
+- The 23:45 job only fires while the process is alive. Under IIS, enable app-pool
+  `startMode=AlwaysRunning` with Application Initialization and disable the idle timeout,
+  or host the API as a Windows Service / console process.
+- **Night shifts are not supported.** A shift crossing midnight splits into two business
+  days: the first gets a check-in with no check-out, the second an unusually early
+  check-in. Supporting them means adding a day-start hour to `WorkSchedule`, which
+  `BusinessTime.ToBusinessDate` can absorb in one place.
+- Device clocks are assumed to be set to the office timezone. Punches stored before this
+  rollup shipped were converted using the *API host's* timezone; if that host was not on
+  UTC+6, those historical timestamps are shifted and recomputing will not fix them.
 
 ## Non-negotiables
 

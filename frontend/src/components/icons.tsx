@@ -29,6 +29,16 @@ export function DeviceIcon({ className }: IconProps) {
   );
 }
 
+export function CalendarIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="1.5" />
+      <path strokeLinecap="round" d="M3.5 9.5h17M8 3.5V6.5M16 3.5V6.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m9 14.5 2 2 4-4" />
+    </svg>
+  );
+}
+
 export function LogsIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className={className} aria-hidden="true">

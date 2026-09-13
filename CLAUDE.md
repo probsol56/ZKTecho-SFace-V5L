@@ -47,11 +47,27 @@ Runs on port 5000 (`pnpm dev` / `pnpm start`).
 ```
 dotnet build
 dotnet run --project backend/AttendanceApi
-dotnet ef migrations add <Name> --project backend/AttendanceApi
-dotnet ef database update --project backend/AttendanceApi
 ```
 
 API runs on `http://localhost:5098` by default (see `frontend/env.example` → `API_BASE_URL`).
+
+### EF Core migrations need an AnyCPU build
+
+`dotnet ef` runs 64-bit and cannot load the x86 output, failing with
+`Could not load assembly 'AttendanceApi'`. Build AnyCPU first, then run the tool
+against that build — and rebuild normally afterwards so the runtime output is x86 again:
+
+```
+cd backend/AttendanceApi
+dotnet build -p:PlatformTarget=AnyCPU --no-incremental
+dotnet ef migrations add <Name> --no-build
+dotnet build -p:PlatformTarget=AnyCPU --no-incremental   # recompile so the snapshot is current
+dotnet ef database update --no-build
+dotnet build --no-incremental                            # back to x86
+```
+
+`--no-build` reads the *compiled* model snapshot, so skipping the second rebuild makes
+EF diff against a stale model and report phantom pending changes.
 
 ## Non-negotiable rules (IMPORTANT)
 

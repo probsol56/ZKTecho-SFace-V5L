@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAttendanceLogs, getDevices } from "@/lib/api";
+import { BUSINESS_TIME_ZONE } from "@/lib/attendance";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -130,7 +131,9 @@ export default async function LogsPage({
                     <td className="px-4 py-3 font-medium text-foreground">{log.employeeName}</td>
                     <td className="px-4 py-3 font-mono text-muted">{log.deviceUserId}</td>
                     <td className="px-4 py-3 text-muted">{log.deviceName}</td>
-                    <td className="px-4 py-3 font-mono text-muted">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="px-4 py-3 font-mono text-muted">
+                      {new Date(log.timestamp).toLocaleString(undefined, { timeZone: BUSINESS_TIME_ZONE })}
+                    </td>
                   </tr>
                 ))}
               </tbody>

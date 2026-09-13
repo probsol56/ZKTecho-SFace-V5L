@@ -1,4 +1,5 @@
 using AttendanceApi.Data;
+using AttendanceApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,8 +37,7 @@ public class DashboardController(AttendanceDbContext db) : ControllerBase
     public async Task<ActionResult<DashboardSummaryResponse>> GetSummary(CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var todayStart = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Utc);
-        var todayEnd = todayStart.AddDays(1);
+        var (todayStart, todayEnd) = BusinessTime.UtcRange(BusinessTime.Today());
 
         var devices = await db.Devices.OrderBy(d => d.Name).ToListAsync(ct);
 

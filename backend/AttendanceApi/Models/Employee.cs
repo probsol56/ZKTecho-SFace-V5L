@@ -11,5 +11,10 @@ public class Employee
     public string? CardNumber { get; set; }
     public int Role { get; set; }
 
+    // Drive absence generation: a day with no punch only counts against someone who
+    // is still employed and had already joined. Device sync never clears these.
+    public bool IsActive { get; set; } = true;
+    public DateOnly? JoinDate { get; set; }
+
     public List<AttendanceLog> AttendanceLogs { get; set; } = [];
 }

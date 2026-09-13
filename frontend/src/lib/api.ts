@@ -15,6 +15,8 @@ export type Employee = {
   name: string;
   cardNumber: string | null;
   role: number;
+  isActive: boolean;
+  joinDate: string | null;
 };
 
 export type AttendanceLogEntry = {
@@ -77,6 +79,103 @@ export type PagedResult<T> = {
   totalPages: number;
 };
 
+// Times are returned twice: the raw UTC instant, and a "HH:mm" string already
+// converted to the office timezone. Render the *Local fields - formatting the
+// instant in the browser would show the viewer's timezone instead.
+export type DailyAttendanceRow = {
+  employeeId: number;
+  employeeName: string;
+  deviceUserId: string;
+  status: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  checkInLocal: string | null;
+  checkOutLocal: string | null;
+  workedMinutes: number;
+  lateMinutes: number;
+  punchCount: number;
+};
+
+export type DailyAttendanceSummary = {
+  totalEmployees: number;
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  pending: number;
+  totalWorkedMinutes: number;
+  totalLateMinutes: number;
+};
+
+export type DailyAttendanceList = {
+  date: string;
+  isWeekend: boolean;
+  isFinalized: boolean;
+  timeZoneId: string;
+  summary: DailyAttendanceSummary;
+  employees: PagedResult<DailyAttendanceRow>;
+};
+
+export type EmployeeMonthDay = {
+  date: string;
+  dayOfWeek: string;
+  isWeekend: boolean;
+  status: string;
+  checkInLocal: string | null;
+  checkOutLocal: string | null;
+  workedMinutes: number;
+  lateMinutes: number;
+};
+
+export type EmployeeMonthTotals = {
+  presentDays: number;
+  lateDays: number;
+  absentDays: number;
+  leaveDays: number;
+  weekendDays: number;
+  workingDays: number;
+  totalWorkedMinutes: number;
+  totalLateMinutes: number;
+};
+
+export type EmployeeMonth = {
+  employeeId: number;
+  employeeName: string;
+  deviceUserId: string;
+  month: string;
+  fromDate: string;
+  toDate: string;
+  timeZoneId: string;
+  totals: EmployeeMonthTotals;
+  days: EmployeeMonthDay[];
+};
+
+export type WorkSchedule = {
+  startTime: string;
+  endTime: string;
+  graceMinutes: number;
+  weekendDays: string[];
+  timeZoneId: string;
+  updatedAt: string;
+};
+
+export type RecomputeResult = {
+  daysProcessed: number;
+  rowsWritten: number;
+  rowsDeleted: number;
+  absencesCreated: number;
+};
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, statusText: string, body: string) {
+    super(`API request failed: ${status} ${statusText} ${body}`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -86,7 +185,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`API request failed: ${res.status} ${res.statusText} ${body}`);
+    throw new ApiError(res.status, res.statusText, body);
   }
 
   if (res.status === 204) return undefined as T;
@@ -146,4 +245,49 @@ export function getAttendanceLogs(params: {
 
   const qs = query.toString();
   return apiFetch<PagedResult<AttendanceLogEntry>>(`/api/attendancelogs${qs ? `?${qs}` : ""}`);
+}
+
+export function updateEmployee(id: number, input: { name: string; isActive: boolean; joinDate: string | null }) {
+  return apiFetch<Employee>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function getDailyAttendance(params: {
+  date?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params.date) query.set("date", params.date);
+  if (params.status) query.set("status", params.status);
+  if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("pageSize", String(params.pageSize));
+
+  const qs = query.toString();
+  return apiFetch<DailyAttendanceList>(`/api/attendance-days${qs ? `?${qs}` : ""}`);
+}
+
+export function getEmployeeMonth(employeeId: number, month?: string) {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+  return apiFetch<EmployeeMonth>(`/api/attendance-days/employees/${employeeId}${qs}`);
+}
+
+export function recomputeAttendanceDays(input: { from: string; to: string; employeeIds?: number[] }) {
+  return apiFetch<RecomputeResult>("/api/attendance-days/recompute", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getWorkSchedule() {
+  return apiFetch<WorkSchedule>("/api/work-schedule");
+}
+
+export function updateWorkSchedule(input: {
+  startTime: string;
+  endTime: string;
+  graceMinutes: number;
+  weekendDays: string[];
+}) {
+  return apiFetch<WorkSchedule>("/api/work-schedule", { method: "PUT", body: JSON.stringify(input) });
 }

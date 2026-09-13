@@ -77,9 +77,10 @@ public class ZkemkeeperDeviceClient : IZkDeviceClient
                                out var second,
                                ref workCode))
                     {
-                        var timestamp = DateTime.SpecifyKind(
-                            new DateTime(year, month, day, hour, minute, second),
-                            DateTimeKind.Local).ToUniversalTime();
+                        // The terminal reports its own wall clock, configured to the
+                        // office timezone - not the API host's, which may differ.
+                        var timestamp = BusinessTime.ToUtc(
+                            new DateTime(year, month, day, hour, minute, second));
                         logs.Add(new DeviceAttendanceRecord(deviceUserId, timestamp, verifyMode, inOutMode));
                     }
                 }

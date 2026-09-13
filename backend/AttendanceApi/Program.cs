@@ -13,8 +13,14 @@ builder.Services.AddDbContext<AttendanceDbContext>(options =>
 builder.Services.AddScoped<IZkDeviceClient, ZkemkeeperDeviceClient>();
 builder.Services.AddScoped<DeviceSyncService>();
 builder.Services.AddScoped<DeviceTemplateTransferService>();
+builder.Services.AddScoped<AttendanceDayService>();
+builder.Services.AddHostedService<DailyAttendanceFinalizerService>();
 
 var app = builder.Build();
+
+// Resolve the office timezone up front: BusinessTime.Zone is a static initializer, so
+// a host without tzdata would otherwise fail deep inside the first request instead.
+app.Logger.LogInformation("Business timezone resolved: {TimeZone}", BusinessTime.Zone.Id);
 
 if (app.Environment.IsDevelopment())
 {

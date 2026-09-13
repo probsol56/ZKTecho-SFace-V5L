@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Pagination } from "@/components/ui/Pagination";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { EditEmployeeButton } from "./EditEmployeeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,9 @@ export default async function EmployeesPage({
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Device user ID</th>
                   <th className="px-4 py-3">Card number</th>
+                  <th className="px-4 py-3">Join date</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Edit</th>
                 </tr>
               </thead>
               <tbody>
@@ -58,6 +63,17 @@ export default async function EmployeesPage({
                     </td>
                     <td className="px-4 py-3 font-mono text-muted">{employee.deviceUserId}</td>
                     <td className="px-4 py-3 font-mono text-muted">{employee.cardNumber ?? "—"}</td>
+                    <td className="px-4 py-3 font-mono text-muted">{employee.joinDate ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <StatusPill tone={employee.isActive ? "success" : "neutral"}>
+                        {employee.isActive ? "Active" : "Inactive"}
+                      </StatusPill>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end">
+                        <EditEmployeeButton employee={employee} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

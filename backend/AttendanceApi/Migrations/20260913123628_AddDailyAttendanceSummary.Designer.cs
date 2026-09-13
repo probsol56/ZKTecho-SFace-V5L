@@ -3,6 +3,7 @@ using System;
 using AttendanceApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AttendanceApi.Migrations
 {
     [DbContext(typeof(AttendanceDbContext))]
-    partial class AttendanceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913123628_AddDailyAttendanceSummary")]
+    partial class AddDailyAttendanceSummary
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,7 +57,7 @@ namespace AttendanceApi.Migrations
                     b.HasIndex("EmployeeId", "DeviceId", "Timestamp")
                         .IsUnique();
 
-                    b.ToTable("AttendanceLogs", (string)null);
+                    b.ToTable("AttendanceLogs");
                 });
 
             modelBuilder.Entity("AttendanceApi.Models.DailyAttendance", b =>
@@ -129,7 +132,7 @@ namespace AttendanceApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Devices", (string)null);
+                    b.ToTable("Devices");
                 });
 
             modelBuilder.Entity("AttendanceApi.Models.Employee", b =>
@@ -167,7 +170,7 @@ namespace AttendanceApi.Migrations
                     b.HasIndex("DeviceUserId")
                         .IsUnique();
 
-                    b.ToTable("Employees", (string)null);
+                    b.ToTable("Employees");
                 });
 
             modelBuilder.Entity("AttendanceApi.Models.WorkSchedule", b =>
@@ -195,7 +198,7 @@ namespace AttendanceApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WorkSchedules", null, t =>
+                    b.ToTable("WorkSchedules", t =>
                         {
                             t.HasCheckConstraint("CK_WorkSchedules_SingleRow", "\"Id\" = 1");
                         });

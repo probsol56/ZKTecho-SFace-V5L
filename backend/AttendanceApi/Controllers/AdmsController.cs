@@ -1,3 +1,4 @@
+using System.Globalization;
 using AttendanceApi.Data;
 using AttendanceApi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,15 @@ namespace AttendanceApi.Controllers;
 public class AdmsController(AttendanceDbContext db, DeviceSyncService syncService, ILogger<AdmsController> logger)
     : ControllerBase
 {
+    // Terminals send a fixed, culture-free layout; parsing with the host's current
+    // culture would silently drop every line on a differently-configured machine.
+    private static readonly string[] DeviceTimestampFormats =
+    [
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-ddTHH:mm:ss",
+        "yyyy-MM-dd HH:mm",
+    ];
+
     // Device registration/heartbeat: GET /iclock/cdata?SN=...&options=all
     // Called on boot and periodically. No "table" query param distinguishes it
     // from the data-upload GET/POST below of the same path.
@@ -62,12 +72,12 @@ public class AdmsController(AttendanceDbContext db, DeviceSyncService syncServic
         {
             case "ATTLOG":
                 var logs = ParseAttendanceLogs(body);
-                var inserted = await syncService.InsertNewLogsAsync(device, logs, ct);
+                var insert = await syncService.InsertNewLogsAsync(device, logs, ct);
                 device.LastSyncedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync(ct);
                 logger.LogInformation(
-                    "ADMS ATTLOG push from {DeviceName} ({SerialNumber}): {Inserted} new logs of {Total} received",
-                    device.Name, serialNumber, inserted, logs.Count);
+                    "ADMS ATTLOG push from {DeviceName} ({SerialNumber}): {Inserted} new logs of {Total} received, {DayRowsWritten} attendance days updated",
+                    device.Name, serialNumber, insert.InsertedCount, logs.Count, insert.DayRowsWritten);
                 break;
 
             case "OPERLOG":
@@ -150,15 +160,25 @@ public class AdmsController(AttendanceDbContext db, DeviceSyncService syncServic
         {
             var fields = rawLine.Trim('\r').Split('\t');
             if (fields.Length < 4) continue;
-            if (!DateTime.TryParse(fields[1], out var localTimestamp)) continue;
+            if (!TryParseDeviceTimestamp(fields[1], out var localTimestamp)) continue;
             if (!int.TryParse(fields[2], out var inOutMode)) inOutMode = 0;
             if (!int.TryParse(fields[3], out var verifyMode)) verifyMode = 0;
 
-            var timestamp = DateTime.SpecifyKind(localTimestamp, DateTimeKind.Local).ToUniversalTime();
-            records.Add(new DeviceAttendanceRecord(fields[0], timestamp, verifyMode, inOutMode));
+            // Terminals send their own wall clock, which is configured to the office
+            // timezone - not the API host's, which may differ or be UTC.
+            records.Add(new DeviceAttendanceRecord(
+                fields[0], BusinessTime.ToUtc(localTimestamp), verifyMode, inOutMode));
         }
         return records;
     }
+
+    private static bool TryParseDeviceTimestamp(string value, out DateTime timestamp) =>
+        DateTime.TryParseExact(
+            value.Trim(),
+            DeviceTimestampFormats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out timestamp);
 
     // OPERLOG user lines look like: USER PIN=1\tName=John Doe\tPri=0\tCard=12345\t...
     private static List<DeviceUserRecord> ParseUserRecords(string body)

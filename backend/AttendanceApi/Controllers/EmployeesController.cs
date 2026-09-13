@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AttendanceApi.Controllers;
 
+public record UpdateEmployeeRequest(string Name, bool IsActive, DateOnly? JoinDate);
+
 [ApiController]
 [Route("api/[controller]")]
 public class EmployeesController(AttendanceDbContext db) : ControllerBase
@@ -32,5 +34,28 @@ public class EmployeesController(AttendanceDbContext db) : ControllerBase
         var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
 
         return new PagedResult<Employee>(items, page, pageSize, totalCount, totalPages);
+    }
+
+    // Employees are created by device sync, but IsActive and JoinDate are HR facts the
+    // terminal knows nothing about - they decide who absence is generated for.
+    // DeviceUserId, CardNumber and Role stay device-owned and are not editable here.
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<Employee>> Update(
+        int id,
+        [FromBody] UpdateEmployeeRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest("Name is required.");
+
+        var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == id, ct);
+        if (employee is null) return NotFound();
+
+        employee.Name = request.Name.Trim();
+        employee.IsActive = request.IsActive;
+        employee.JoinDate = request.JoinDate;
+
+        await db.SaveChangesAsync(ct);
+
+        return employee;
     }
 }

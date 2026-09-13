@@ -6,7 +6,13 @@ namespace AttendanceApi.Services;
 
 public record SyncResult(int UsersUpserted, int LogsInserted);
 
-public class DeviceSyncService(AttendanceDbContext db, IZkDeviceClient deviceClient, ILogger<DeviceSyncService> logger)
+public record InsertLogsResult(int InsertedCount, int DayRowsWritten);
+
+public class DeviceSyncService(
+    AttendanceDbContext db,
+    IZkDeviceClient deviceClient,
+    AttendanceDayService attendanceDays,
+    ILogger<DeviceSyncService> logger)
 {
     public async Task<SyncResult> SyncAsync(int deviceId, CancellationToken ct = default)
     {
@@ -17,16 +23,16 @@ public class DeviceSyncService(AttendanceDbContext db, IZkDeviceClient deviceCli
         var usersUpserted = await UpsertEmployeesAsync(users, ct);
 
         var logs = await deviceClient.GetAttendanceLogsAsync(device.IpAddress, device.Port);
-        var logsInserted = await InsertNewLogsAsync(device, logs, ct);
+        var insert = await InsertNewLogsAsync(device, logs, ct);
 
         device.LastSyncedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "Synced device {DeviceName} ({DeviceId}): {UsersUpserted} users, {LogsInserted} new logs",
-            device.Name, device.Id, usersUpserted, logsInserted);
+            "Synced device {DeviceName} ({DeviceId}): {UsersUpserted} users, {LogsInserted} new logs, {DayRowsWritten} attendance days updated",
+            device.Name, device.Id, usersUpserted, insert.InsertedCount, insert.DayRowsWritten);
 
-        return new SyncResult(usersUpserted, logsInserted);
+        return new SyncResult(usersUpserted, insert.InsertedCount);
     }
 
     public async Task<int> UpsertEmployeesAsync(IReadOnlyList<DeviceUserRecord> users, CancellationToken ct)
@@ -62,9 +68,12 @@ public class DeviceSyncService(AttendanceDbContext db, IZkDeviceClient deviceCli
         return users.Count;
     }
 
-    public async Task<int> InsertNewLogsAsync(Device device, IReadOnlyList<DeviceAttendanceRecord> logs, CancellationToken ct)
+    // Recomputes the affected days itself rather than leaving it to callers, so both
+    // ingest paths (ADMS push and device pull) stay in sync by construction.
+    public async Task<InsertLogsResult> InsertNewLogsAsync(
+        Device device, IReadOnlyList<DeviceAttendanceRecord> logs, CancellationToken ct)
     {
-        if (logs.Count == 0) return 0;
+        if (logs.Count == 0) return new InsertLogsResult(0, 0);
 
         var deviceUserIds = logs.Select(l => l.DeviceUserId).Distinct().ToList();
         var employeeIdsByDeviceUserId = await db.Employees
@@ -82,6 +91,7 @@ public class DeviceSyncService(AttendanceDbContext db, IZkDeviceClient deviceCli
         var existingKeySet = existingKeys.Select(k => (k.EmployeeId, k.Timestamp)).ToHashSet();
 
         var inserted = 0;
+        var affectedDays = new HashSet<AttendanceDayKey>();
         foreach (var log in logs)
         {
             if (!employeeIdsByDeviceUserId.TryGetValue(log.DeviceUserId, out var employeeId))
@@ -103,9 +113,26 @@ public class DeviceSyncService(AttendanceDbContext db, IZkDeviceClient deviceCli
                 InOutMode = log.InOutMode,
             });
             inserted++;
+            affectedDays.Add(new AttendanceDayKey(employeeId, BusinessTime.ToBusinessDate(log.Timestamp)));
         }
 
         await db.SaveChangesAsync(ct);
-        return inserted;
+
+        // Punches are already committed and irreplaceable; the summary is a derived,
+        // idempotent projection that the nightly finaliser and the recompute endpoint
+        // both heal. Never fail the ingest over it - on the ADMS path a non-"OK"
+        // response makes the terminal retry the batch forever.
+        try
+        {
+            var outcome = await attendanceDays.RecomputeAsync(affectedDays, ct);
+            return new InsertLogsResult(inserted, outcome.RowsWritten);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Stored {Inserted} punches from device {DeviceId} but failed to update {DayCount} attendance days; they will be rebuilt by the nightly finaliser",
+                inserted, device.Id, affectedDays.Count);
+            return new InsertLogsResult(inserted, 0);
+        }
     }
 }
